@@ -24,8 +24,10 @@
 #include "outfit.h"
 #include "common.h"
 #include <chrono>
+#include <cstddef>
 #include <deque>
 #include <memory>
+#include <unordered_map>
 
 #include "client_version.h"
 #include <wx/artprov.h>
@@ -44,6 +46,8 @@ enum SpriteSize {
 	SPRITE_SIZE_32x32,
 	SPRITE_SIZE_COUNT
 };
+
+[[nodiscard]] uint32_t GetOutfitColorRgb(std::size_t colorId);
 
 enum AnimationDirection {
 	ANIMATION_FORWARD = 0,
@@ -126,7 +130,20 @@ public:
 	void unloadDC() override;
 
 	void clean(int time);
-	bool getVisualPreviewRGBA(std::vector<uint8_t>& pixels, int& pixelWidth, int& pixelHeight, bool& pending, bool allowAsync = true, const Outfit* outfit = nullptr);
+	bool getVisualPreviewRGBA(
+		std::vector<uint8_t>& pixels,
+		int& pixelWidth,
+		int& pixelHeight,
+		bool& pending,
+		bool allowAsync = true,
+		const Outfit* outfit = nullptr,
+		int direction = 2,
+		int frame = 0,
+		int patternZ = 0,
+		int patternX = 0,
+		int patternY = 0,
+		int mountClientId = 0
+	);
 	bool getVisualFingerprint(SpriteVisualFingerprint& fingerprint, bool& pending, bool allowAsync = true);
 
 	int getDrawHeight() const;
@@ -359,6 +376,8 @@ public:
 
 	Sprite* getSprite(int id);
 	GameSprite* getCreatureSprite(int id);
+	GameSprite* getEffectSprite(int id);
+	GameSprite* getDistanceSprite(int id);
 	GameSprite* getEditorSprite(int id);
 
 	long getElapsedTime() const {
@@ -366,6 +385,10 @@ public:
 	}
 
 	uint16_t getItemSpriteMaxID() const;
+	uint16_t getEffectSpriteMaxID() const;
+	uint16_t getDistanceSpriteMaxID() const;
+	std::size_t getDeferredAppearanceVisualCount() const;
+	std::size_t getMaterializedAppearanceVisualCount() const;
 
 	// Get an unused texture id (this is acquired by simply increasing a value starting from 0x10000000)
 	GLuint getFreeTextureID();
@@ -382,6 +405,8 @@ public:
 	bool loadSpriteData(const FileName& datafile, wxString& error, wxArrayString& warnings);
 	bool loadAppearanceItem(const rme::protobuf::appearances::Appearance& appearance, ItemType* item, wxString& error, wxArrayString& warnings);
 	bool loadAppearanceOutfit(const rme::protobuf::appearances::Appearance& appearance, wxString& error, wxArrayString& warnings);
+	bool loadAppearanceEffect(const rme::protobuf::appearances::Appearance& appearance, wxString& error, wxArrayString& warnings);
+	bool loadAppearanceMissile(const rme::protobuf::appearances::Appearance& appearance, wxString& error, wxArrayString& warnings);
 
 	// Cleans old & unused textures according to config settings
 	void garbageCollection();
@@ -456,6 +481,7 @@ private:
 		wxString& error,
 		wxArrayString& warnings
 	);
+	bool materializeAppearanceVisual(uint16_t id, bool distanceEffect);
 
 	typedef std::map<int, Sprite*> SpriteMap;
 	SpriteMap sprite_space;
@@ -466,6 +492,11 @@ private:
 	DatFormat dat_format;
 	uint16_t item_count;
 	uint16_t creature_count;
+	uint16_t effect_count;
+	uint16_t distance_count;
+	std::unordered_map<uint16_t, std::shared_ptr<const rme::protobuf::appearances::Appearance>> deferredEffectAppearances;
+	std::unordered_map<uint16_t, std::shared_ptr<const rme::protobuf::appearances::Appearance>> deferredMissileAppearances;
+	std::size_t materializedAppearanceVisuals = 0;
 	bool otfi_found;
 	bool is_extended;
 	bool has_transparency;
